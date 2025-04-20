@@ -1,0 +1,18 @@
+{
+  "project": {
+    "name": "space",
+    "type": "spa",
+    "buildCommand": "npm run build"
+  },
+  "server": {
+    "ip": "171.22.124.157",
+    "username": "root"
+  },
+  "deploy": {
+    "localPath": "dist",
+    "remotePath": "/var/www/spa/space",
+    "preDeploy": null,
+    "postDeploy": null
+  },
+  "nginx": null
+}
