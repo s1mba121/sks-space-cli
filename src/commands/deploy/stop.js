@@ -1,6 +1,12 @@
-const { loadProjectConfig, configExists } = require("../../services/projectConfig");
+const {
+    loadProjectConfig,
+    configExists,
+} = require("../../services/projectConfig");
 const { execSync } = require("child_process");
 const chalk = require("chalk");
+const { getLangObject } = require("../../services/lang");
+
+const lang = getLangObject();
 
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
@@ -15,7 +21,7 @@ module.exports = async () => {
     const env = process.argv.includes("--prod") ? "prod" : "dev";
 
     if (!(await configExists(env))) {
-        log.error(`Конфигурация .space.${env}.json не найдена`);
+        log.error(lang.CONFIG_NOT_FOUND(env));
         process.exit(1);
     }
 
@@ -31,8 +37,8 @@ module.exports = async () => {
 
     try {
         execSync(sshCommand, { stdio: "inherit" });
-        log.success(`Сервер на порту ${port} остановлен`);
+        log.success(lang.SERVER_STOPPED(port));
     } catch (err) {
-        log.error(`Не удалось остановить сервер: ${err.message}`);
+        log.error(lang.SERVER_STOP_FAILED(err.message));
     }
 };

@@ -3,6 +3,9 @@ const path = require("path");
 const fs = require("fs-extra");
 const { saveProjectConfig } = require("../services/projectConfig");
 const { loadConfig } = require("../services/config");
+const { getLangObject } = require("../services/lang");
+
+const lang = getLangObject();
 
 const chalk = require("chalk");
 
@@ -15,7 +18,7 @@ const log = {
 };
 
 module.exports = {
-    description: "Инициализировать проект с конфигурацией деплоя",
+    description: lang.INIT_PROJECT_DESC,
     action: async () => {
         const saved = await loadConfig();
         const cwdName = path.basename(process.cwd());
@@ -24,12 +27,12 @@ module.exports = {
             {
                 type: "list",
                 name: "envType",
-                message: "Какую среду настраиваем?",
+                message: lang.SELECT_ENV,
                 choices: [
-                    { name: "Разработка (dev)", value: "dev" },
-                    { name: "Продакшен (production)", value: "prod" }
-                ]
-            }
+                    { name: lang.DEV_ENV, value: "dev" },
+                    { name: lang.PROD_ENV, value: "prod" },
+                ],
+            },
         ]);
 
         const configPath = `.space.${envType}.json`;
@@ -40,47 +43,48 @@ module.exports = {
                 {
                     type: "confirm",
                     name: "overwrite",
-                    message: `Файл ${configPath} уже существует. Перезаписать?`,
-                    default: false
-                }
+                    message: `${lang.FILE_EXISTS} ${configPath}. ${lang.OVERWRITE_CONFIRM}`,
+                    default: false,
+                },
             ]);
 
             if (!overwrite) {
-                log.warn("Отмена инициализации.");
+                log.warn(lang.CANCEL_INIT);
                 return;
             }
         }
 
-        const { ip, username, projectName, projectType } = await inquirer.prompt([
-            {
-                type: "input",
-                name: "ip",
-                message: "IP сервера:",
-                default: saved?.ip || undefined
-            },
-            {
-                type: "input",
-                name: "username",
-                message: "Пользователь:",
-                default: saved?.username || undefined
-            },
-            {
-                type: "input",
-                name: "projectName",
-                message: "Имя проекта:",
-                default: cwdName
-            },
-            {
-                type: "list",
-                name: "projectType",
-                message: "Тип проекта:",
-                choices: [
-                    { name: "Single Page App (React/Vue)", value: "spa" },
-                    { name: "Node.js Backend", value: "node" },
-                    { name: "Static HTML", value: "static" },
-                ]
-            }
-        ]);
+        const { ip, username, projectName, projectType } =
+            await inquirer.prompt([
+                {
+                    type: "input",
+                    name: "ip",
+                    message: lang.PROMPT_IP,
+                    default: saved?.ip || undefined,
+                },
+                {
+                    type: "input",
+                    name: "username",
+                    message: lang.PROMPT_USER,
+                    default: saved?.username || undefined,
+                },
+                {
+                    type: "input",
+                    name: "projectName",
+                    message: lang.PROMPT_PROJECT_NAME,
+                    default: cwdName,
+                },
+                {
+                    type: "list",
+                    name: "projectType",
+                    message: lang.PROMPT_PROJECT_TYPE,
+                    choices: [
+                        { name: lang.SPA_TYPE, value: "spa" },
+                        { name: lang.NODE_TYPE, value: "node" },
+                        { name: lang.STATIC_TYPE, value: "static" },
+                    ],
+                },
+            ]);
 
         const pathMap = {
             spa: `/var/www/spa/${projectName}`,
@@ -93,7 +97,7 @@ module.exports = {
 
         if (projectType === "node") {
             defaultLocalPath = ".";
-            log.info("Node.js проект: команда сборки не требуется.");
+            log.info(lang.NODE_PROJECT_INFO);
         } else {
             let detectedBuild = null;
             try {
@@ -101,44 +105,45 @@ module.exports = {
                 if (pkg.scripts?.build) {
                     detectedBuild = "npm run build";
                 }
-            } catch { }
+            } catch {}
 
             const buildPrompt = await inquirer.prompt([
                 {
                     type: "input",
                     name: "buildCommand",
-                    message: "Команда сборки:",
-                    default: detectedBuild || ""
-                }
+                    message: lang.PROMPT_BUILD_COMMAND,
+                    default: detectedBuild || "",
+                },
             ]);
 
             buildCommand = buildPrompt.buildCommand;
         }
 
-        const { localPath, remotePath, preDeploy, postDeploy } = await inquirer.prompt([
-            {
-                type: "input",
-                name: "localPath",
-                message: "Путь к локальной папке (build/dist):",
-                default: defaultLocalPath
-            },
-            {
-                type: "input",
-                name: "remotePath",
-                message: "Путь на сервере:",
-                default: pathMap[projectType] || `~/sites/${projectName}`
-            },
-            {
-                type: "input",
-                name: "preDeploy",
-                message: "Команда перед деплоем (опционально):"
-            },
-            {
-                type: "input",
-                name: "postDeploy",
-                message: "Команда после деплоя (опционально):"
-            }
-        ]);
+        const { localPath, remotePath, preDeploy, postDeploy } =
+            await inquirer.prompt([
+                {
+                    type: "input",
+                    name: "localPath",
+                    message: lang.PROMPT_LOCAL_PATH,
+                    default: defaultLocalPath,
+                },
+                {
+                    type: "input",
+                    name: "remotePath",
+                    message: lang.PROMPT_REMOTE_PATH,
+                    default: pathMap[projectType] || `~/sites/${projectName}`,
+                },
+                {
+                    type: "input",
+                    name: "preDeploy",
+                    message: lang.PROMPT_PRE_DEPLOY,
+                },
+                {
+                    type: "input",
+                    name: "postDeploy",
+                    message: lang.PROMPT_POST_DEPLOY,
+                },
+            ]);
 
         let includeEnv = false;
         const envPath = path.join(process.cwd(), ".env");
@@ -147,9 +152,9 @@ module.exports = {
                 {
                     type: "confirm",
                     name: "loadEnv",
-                    message: "Обнаружен .env файл. Загружать его при деплое?",
-                    default: true
-                }
+                    message: lang.PROMPT_LOAD_ENV,
+                    default: true,
+                },
             ]);
             includeEnv = loadEnv;
         }
@@ -160,9 +165,9 @@ module.exports = {
             {
                 type: "confirm",
                 name: "nginxAlreadyConfigured",
-                message: "Nginx уже настроен для этого проекта?",
-                default: false
-            }
+                message: lang.PROMPT_NGINX_CONFIGURED,
+                default: false,
+            },
         ]);
 
         if (!nginxAlreadyConfigured) {
@@ -170,9 +175,9 @@ module.exports = {
                 {
                     type: "confirm",
                     name: "wantsNginx",
-                    message: "Настроить домен и Nginx?",
-                    default: envType === "prod"
-                }
+                    message: lang.PROMPT_NGINX_SETUP,
+                    default: envType === "prod",
+                },
             ]);
 
             if (wantsNginx) {
@@ -180,39 +185,42 @@ module.exports = {
                     {
                         type: "input",
                         name: "domain",
-                        message: "Основной домен (example.com):"
+                        message: lang.PROMPT_DOMAIN,
                     },
-                    ...(envType === "dev" ? [
-                        {
-                            type: "input",
-                            name: "subdomain",
-                            message: "Субдомен для dev (например, dev):",
-                            default: "dev"
-                        },
-                        {
-                            type: "input",
-                            name: "port",
-                            message: "Локальный порт приложения (например, 3000):",
-                            default: 3000
-                        }
-                    ] : [
-                        {
-                            type: "input",
-                            name: "port",
-                            message: "Локальный порт приложения (например, 3000):"
-                        }
-                    ]),
+                    ...(envType === "dev"
+                        ? [
+                              {
+                                  type: "input",
+                                  name: "subdomain",
+                                  message: lang.PROMPT_SUBDOMAIN,
+                                  default: "dev",
+                              },
+                              {
+                                  type: "input",
+                                  name: "port",
+                                  message: lang.PROMPT_PORT,
+                                  default: 3000,
+                              },
+                          ]
+                        : [
+                              {
+                                  type: "input",
+                                  name: "port",
+                                  message: lang.PROMPT_PORT,
+                              },
+                          ]),
                     {
                         type: "confirm",
                         name: "ssl",
-                        message: "Настроить HTTPS (Let's Encrypt)?",
-                        default: true
-                    }
+                        message: lang.PROMPT_SSL,
+                        default: true,
+                    },
                 ]);
 
-                const serverName = envType === "dev"
-                    ? `${nginx.subdomain}.${nginx.domain}`
-                    : nginx.domain;
+                const serverName =
+                    envType === "dev"
+                        ? `${nginx.subdomain}.${nginx.domain}`
+                        : nginx.domain;
 
                 const nginxConf = `
 server {
@@ -225,39 +233,45 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 
-    ${nginx.ssl ? `
+    ${
+        nginx.ssl
+            ? `
     listen 443 ssl;
     ssl_certificate /etc/letsencrypt/live/${serverName}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${serverName}/privkey.pem;
-    ` : ""}
+    `
+            : ""
+    }
 }
                 `.trim();
 
                 const nginxPath = `nginx.${envType}.conf`;
                 await fs.writeFile(nginxPath, nginxConf);
-                log.success(`Конфигурация Nginx сохранена в ${nginxPath}`);
+                log.success(`${lang.NGINX_CONFIG_SAVED} ${nginxPath}`);
             }
         } else {
             nginx = await inquirer.prompt([
                 {
                     type: "input",
                     name: "domain",
-                    message: "Основной домен (example.com):"
+                    message: lang.PROMPT_DOMAIN,
                 },
-                ...(envType === "dev" ? [
-                    {
-                        type: "input",
-                        name: "subdomain",
-                        message: "Субдомен для dev (например, dev):",
-                        default: "dev"
-                    }
-                ] : []),
+                ...(envType === "dev"
+                    ? [
+                          {
+                              type: "input",
+                              name: "subdomain",
+                              message: lang.PROMPT_SUBDOMAIN,
+                              default: "dev",
+                          },
+                      ]
+                    : []),
                 {
                     type: "input",
                     name: "port",
-                    message: "Локальный порт приложения (например, 3000):",
-                    default: 3000
-                }
+                    message: lang.PROMPT_PORT,
+                    default: 3000,
+                },
             ]);
         }
 
@@ -268,14 +282,14 @@ server {
             "yarn.lock",
             "npm-debug.log",
             "yarn-error.log",
-            ".DS_Store"
+            ".DS_Store",
         ];
 
         const config = {
             project: {
                 name: projectName,
                 type: projectType,
-                buildCommand: buildCommand || null
+                buildCommand: buildCommand || null,
             },
             server: { ip, username },
             deploy: {
@@ -283,13 +297,13 @@ server {
                 remotePath,
                 preDeploy: preDeploy || null,
                 postDeploy: postDeploy || null,
-                includeEnv
+                includeEnv,
             },
             nginx: nginx || null,
-            ignored
+            ignored,
         };
 
         await saveProjectConfig(config, envType);
-        log.success(`Конфигурация .space.${envType}.json успешно создана!`);
-    }
+        log.success(`${lang.CONFIG_CREATED} .space.${envType}.json!`);
+    },
 };

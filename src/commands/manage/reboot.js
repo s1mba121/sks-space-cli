@@ -2,6 +2,9 @@ const { Client } = require("ssh2");
 const { loadConfig } = require("../../services/config");
 const { getPassword } = require("../../services/keyring");
 const chalk = require("chalk");
+const { getLangObject } = require("../../services/lang");
+
+const lang = getLangObject();
 
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
@@ -13,34 +16,34 @@ const log = {
 };
 
 module.exports = async () => {
-  const config = await loadConfig();
+    const config = await loadConfig();
 
-  if (!config || !config.ip || !config.username) {
-    log.error("Не удалось загрузить конфигурацию или данные для подключения.");
-    return;
-  }
-
-  const { ip, username } = config;
-  const password = await getPassword(username);
-
-  if (!password) {
-    log.error("Не удалось получить пароль. Проверьте настройки SSH.");
-    return;
-  }
-
-  const conn = new Client();
-  conn.on("ready", () => {
-    log.info("Перезагрузка сервера...");
-    conn.exec("sudo reboot", (err, stream) => {
-      if (err) {
-        log.error("Ошибка при перезагрузке:", err.message);
-        conn.end();
+    if (!config || !config.ip || !config.username) {
+        log.error(lang.REBOOT_CONFIG_ERROR);
         return;
-      }
+    }
 
-      stream.on("close", () => {
-        conn.end();
-      });
-    });
-  }).connect({ host: ip, username, password });
+    const { ip, username } = config;
+    const password = await getPassword(username);
+
+    if (!password) {
+        log.error(lang.REBOOT_PASSWORD_ERROR);
+        return;
+    }
+
+    const conn = new Client();
+    conn.on("ready", () => {
+        log.info(lang.REBOOT_START);
+        conn.exec("sudo reboot", (err, stream) => {
+            if (err) {
+                log.error(`${lang.REBOOT_EXEC_ERROR}: ${err.message}`);
+                conn.end();
+                return;
+            }
+
+            stream.on("close", () => {
+                conn.end();
+            });
+        });
+    }).connect({ host: ip, username, password });
 };

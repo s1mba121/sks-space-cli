@@ -1,5 +1,7 @@
 const chalk = require("chalk");
+const { getLangObject } = require("../../services/lang");
 
+const lang = getLangObject();
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
     success: (msg) => console.log(`${chalk.green("✔")}  ${msg}`),
@@ -10,7 +12,7 @@ const log = {
 };
 
 module.exports = async () => {
-    log.info("Перезапуск приложения...");
+    log.info(lang.RELOAD_MESSAGE);
 
     const stop = require("./stop");
     const start = require("./start");

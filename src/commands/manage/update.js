@@ -2,6 +2,9 @@ const { Client } = require("ssh2");
 const { loadConfig } = require("../../services/config");
 const { getPassword } = require("../../services/keyring");
 const chalk = require("chalk");
+const { getLangObject } = require("../../services/lang");
+
+const lang = getLangObject();
 
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
@@ -13,56 +16,56 @@ const log = {
 };
 
 module.exports = async () => {
-  const config = await loadConfig();
+    const config = await loadConfig();
 
-  if (!config || !config.ip || !config.username) {
-    log.error("Не удалось загрузить конфигурацию или данные для подключения.");
-    return;
-  }
-
-  const { ip, username } = config;
-  const password = await getPassword(username);
-
-  if (!password) {
-    log.error("Пароль не найден. Проверьте настройки SSH.");
-    return;
-  }
-
-  const conn = new Client();
-  conn.on("ready", () => {
-    log.info("Обновляем пакеты на сервере...");
-
-    const commands = [
-      "sudo apt update",
-      "sudo apt upgrade -y",
-      "sudo apt autoremove -y",
-      "sudo apt clean"
-    ];
-
-    let i = 0;
-    const runNext = () => {
-      if (i >= commands.length) {
-        conn.end();
-        log.success("Обновление завершено.");
+    if (!config || !config.ip || !config.username) {
+        log.error(lang.UPDATE_CONFIG_ERROR);
         return;
-      }
+    }
 
-      const cmd = commands[i++];
-      console.log(`[~] ${cmd}`);
-      conn.exec(cmd, (err, stream) => {
-        if (err) {
-          log.error(`Ошибка при выполнении команды: ${err.message}`);
-          return runNext();
-        }
+    const { ip, username } = config;
+    const password = await getPassword(username);
 
-        stream.on("data", (data) => {
-          process.stdout.write(data.toString());
-        });
+    if (!password) {
+        log.error(lang.UPDATE_PASSWORD_ERROR);
+        return;
+    }
 
-        stream.on("close", runNext);
-      });
-    };
+    const conn = new Client();
+    conn.on("ready", () => {
+        log.info(lang.UPDATE_START);
 
-    runNext();
-  }).connect({ host: ip, username, password });
+        const commands = [
+            "sudo apt update",
+            "sudo apt upgrade -y",
+            "sudo apt autoremove -y",
+            "sudo apt clean",
+        ];
+
+        let i = 0;
+        const runNext = () => {
+            if (i >= commands.length) {
+                conn.end();
+                log.success(lang.UPDATE_DONE);
+                return;
+            }
+
+            const cmd = commands[i++];
+            console.log(`[~] ${cmd}`);
+            conn.exec(cmd, (err, stream) => {
+                if (err) {
+                    log.error(`${lang.UPDATE_COMMAND_ERROR}: ${err.message}`);
+                    return runNext();
+                }
+
+                stream.on("data", (data) => {
+                    process.stdout.write(data.toString());
+                });
+
+                stream.on("close", runNext);
+            });
+        };
+
+        runNext();
+    }).connect({ host: ip, username, password });
 };

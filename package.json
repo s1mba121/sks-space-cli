@@ -1,6 +1,6 @@
 {
-  "name": "space",
-  "version": "1.0.0",
+  "name": "sks-space-cli",
+  "version": "1.1.0",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "bin": {
-    "space": "./bin/space.js"
+    "space": "./bin/index.js"
   },
   "description": "",
   "dependencies": {

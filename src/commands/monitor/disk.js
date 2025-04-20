@@ -1,13 +1,24 @@
-// src/commands/disk.js
-const { Client } = require('ssh2');
+const { Client } = require("ssh2");
 const { loadConfig } = require("../../services/config");
 const { getPassword } = require("../../services/keyring");
+const { getLangObject } = require("../../services/lang");
+const chalk = require("chalk");
+
+const lang = getLangObject();
+
+const log = {
+    info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
+    success: (msg) => console.log(`${chalk.green("✔")}  ${msg}`),
+    warn: (msg) => console.log(`${chalk.yellow("~")}  ${msg}`),
+    error: (msg) => console.log(`${chalk.red("✗")}  ${msg}`),
+    section: (msg) => console.log(chalk.whiteBright(`\n=== ${msg} === \n`)),
+};
 
 module.exports = async () => {
     const config = await loadConfig();
 
     if (!config || !config.ip || !config.username) {
-        console.log('[!] Не удалось загрузить конфигурацию или данные для подключения.');
+        log.error(lang.DISK_CONFIG_ERROR);
         return;
     }
 
@@ -15,30 +26,28 @@ module.exports = async () => {
     const password = await getPassword(username);
 
     if (!password) {
-        console.log("[!] Пароль не найден.");
+        log.error(lang.DISK_PASSWORD_ERROR);
         return;
     }
+
     const conn = new Client();
-    conn.on('ready', () => {
-        console.log("[*] Проверяем использование диска...");
-        conn.exec('df -h', (err, stream) => {
+    conn.on("ready", () => {
+        log.info(lang.DISK_CHECK_START);
+        conn.exec("df -h", (err, stream) => {
             if (err) {
-                console.log('[!] Ошибка при получении информации о диске:', err.message);
+                log.error(`${lang.DISK_COMMAND_ERROR}: ${err.message}`);
                 conn.end();
                 return;
             }
 
-            stream.on('data', (data) => {
+            stream.on("data", (data) => {
                 console.log(data.toString());
             });
 
-            stream.on('close', (code) => {
+            stream.on("close", () => {
+                log.success(lang.DISK_DONE);
                 conn.end();
             });
         });
-    }).connect({
-        host: ip,
-        username: username,
-        password: password
-    });
+    }).connect({ host: ip, username, password });
 };

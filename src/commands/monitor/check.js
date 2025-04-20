@@ -1,8 +1,10 @@
-// src/commands/check.js
-const { Client } = require('ssh2');
+const { Client } = require("ssh2");
 const { loadConfig } = require("../../services/config");
 const { getPassword } = require("../../services/keyring");
+const { getLangObject } = require("../../services/lang");
 const chalk = require("chalk");
+
+const lang = getLangObject();
 
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
@@ -17,7 +19,7 @@ module.exports = async () => {
     const config = await loadConfig();
 
     if (!config || !config.ip || !config.username) {
-        log.error("Не удалось загрузить конфигурацию или данные для подключения.");
+        log.error(lang.CHECK_CONFIG_ERROR);
         return;
     }
 
@@ -25,37 +27,39 @@ module.exports = async () => {
     const password = await getPassword(username);
 
     if (!password) {
-        log.error("Пароль не найден. Проверьте настройки SSH.");
+        log.error(lang.CHECK_PASSWORD_ERROR);
         return;
     }
+
     const conn = new Client();
-    conn.on('ready', () => {
-        log.info('Проверка состояния сервисов...');
-        conn.exec('systemctl status nginx && systemctl status node', (err, stream) => {
-            if (err) {
-                log.error(`Ошибка при выполнении команды: ${err.message}`);
-                conn.end();
-                return;
-            }
-
-            stream.on('data', (data) => {
-                const output = data.toString();
-                if (output.includes('active (running)')) {
-                    log.success('Сервисы работают нормально.');
-                } else {
-                    log.warn('Обнаружены проблемы с сервисами:');
-                    console.log(output);
+    conn.on("ready", () => {
+        log.info(lang.CHECK_START);
+        conn.exec(
+            "systemctl status nginx && systemctl status node",
+            (err, stream) => {
+                if (err) {
+                    log.error(`${lang.CHECK_COMMAND_ERROR}: ${err.message}`);
+                    conn.end();
+                    return;
                 }
-            });
 
-            stream.on('close', (code) => {
-                log.success('Проверка завершена.');
-                conn.end();
-            });
-        });
-    }).connect({
-        host: ip,
-        username: username,
-        password: password
-    });
+                let outputData = "";
+
+                stream.on("data", (data) => {
+                    outputData += data.toString();
+                });
+
+                stream.on("close", () => {
+                    if (outputData.includes("active (running)")) {
+                        log.success(lang.CHECK_SERVICES_OK);
+                    } else {
+                        log.warn(lang.CHECK_SERVICES_ISSUE);
+                        console.log(outputData);
+                    }
+                    log.success(lang.CHECK_DONE);
+                    conn.end();
+                });
+            }
+        );
+    }).connect({ host: ip, username, password });
 };
