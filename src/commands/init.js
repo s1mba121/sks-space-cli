@@ -1,13 +1,11 @@
-const { default: inquirer } = require("inquirer");
 const path = require("path");
 const fs = require("fs-extra");
+const chalk = require("chalk");
 const { saveProjectConfig } = require("../services/projectConfig");
 const { loadConfig } = require("../services/config");
 const { getLangObject } = require("../services/lang");
 
 const lang = getLangObject();
-
-const chalk = require("chalk");
 
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
@@ -20,6 +18,7 @@ const log = {
 module.exports = {
     description: lang.INIT_PROJECT_DESC,
     action: async () => {
+        const inquirer = await import("inquirer").then((mod) => mod.default);
         const saved = await loadConfig();
         const cwdName = path.basename(process.cwd());
 
@@ -47,7 +46,6 @@ module.exports = {
                     default: false,
                 },
             ]);
-
             if (!overwrite) {
                 log.warn(lang.CANCEL_INIT);
                 return;
@@ -115,7 +113,6 @@ module.exports = {
                     default: detectedBuild || "",
                 },
             ]);
-
             buildCommand = buildPrompt.buildCommand;
         }
 
@@ -242,8 +239,7 @@ server {
     `
             : ""
     }
-}
-                `.trim();
+}`.trim();
 
                 const nginxPath = `nginx.${envType}.conf`;
                 await fs.writeFile(nginxPath, nginxConf);

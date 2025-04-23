@@ -2,6 +2,7 @@ const { Client } = require("ssh2");
 const { execSync } = require("child_process");
 const chalk = require("chalk");
 const { getLangObject } = require("./lang");
+const os = require("os");
 
 const lang = getLangObject();
 
@@ -25,9 +26,6 @@ function runSSHCommand(conn, command) {
 }
 
 async function setupServer(ip, username, password, type) {
-    const baseCmd = (cmd) =>
-        `sshpass -p '${password}' ssh -o StrictHostKeyChecking=no ${username}@${ip} "${cmd}"`;
-
     const createDirs = {
         spa: ["mkdir -p /var/www/spa"],
         node: ["mkdir -p /var/www/node"],
@@ -45,7 +43,15 @@ async function setupServer(ip, username, password, type) {
 
     try {
         for (const cmd of commands) {
-            execSync(baseCmd(cmd), { stdio: "ignore" });
+            if (process.platform === "win32") {
+                const psCommand = `ssh ${username}@${ip} "${cmd}"`;
+                execSync(`powershell -Command "${psCommand}"`, {
+                    stdio: "ignore",
+                });
+            } else {
+                const sshCommand = `ssh -o StrictHostKeyChecking=no ${username}@${ip} "${cmd}"`;
+                execSync(sshCommand, { stdio: "ignore" });
+            }
         }
         log.success(lang.SERVER_SETUP_SUCCESS);
     } catch (err) {

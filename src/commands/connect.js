@@ -1,12 +1,13 @@
 // src/commands/connect.js
-const { askCredentials, confirmSetup } = require("../utils/prompt");
-const { loadConfig, saveConfig } = require("../services/config");
-const { getPassword, storePassword } = require("../services/keyring");
-const { testConnection, sshConnect, setupServer } = require("../services/ssh");
+const os = require("os");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const chalk = require("chalk");
+const { askCredentials, confirmSetup } = require("../utils/prompt");
+const { loadConfig, saveConfig } = require("../services/config");
+const { getPassword, storePassword } = require("../services/keyring");
+const { testConnection, sshConnect, setupServer } = require("../services/ssh");
 
 const log = {
     info: (msg) => console.log(`${chalk.cyan("i")}  ${msg}`),
@@ -17,12 +18,13 @@ const log = {
 };
 
 function ensureSSHKeyExists() {
-    const keyPath = path.join(process.env.HOME, ".ssh/id_rsa");
+    const homeDir = os.homedir();
+    const keyPath = path.join(homeDir, ".ssh", "id_rsa");
     const pubKeyPath = `${keyPath}.pub`;
 
     if (!fs.existsSync(pubKeyPath)) {
         log.info("SSH ключ не найден. Генерируем...");
-        execSync(`ssh-keygen -t rsa -b 4096 -N "" -f ${keyPath}`, {
+        execSync(`ssh-keygen -t rsa -b 4096 -N "" -f "${keyPath}"`, {
             stdio: "ignore",
         });
         log.success("SSH ключ сгенерирован.");
@@ -32,6 +34,11 @@ function ensureSSHKeyExists() {
 }
 
 function ensureSshpassInstalled() {
+    if (process.platform === "win32") {
+        log.warn("Пропуск проверки sshpass на Windows.");
+        return;
+    }
+
     try {
         execSync("which sshpass", { stdio: "ignore" });
     } catch {
@@ -49,18 +56,34 @@ function ensureSshpassInstalled() {
 }
 
 function sendSSHKey(ip, username, password) {
-    const pubKeyPath = path.join(process.env.HOME, ".ssh/id_rsa.pub");
-    try {
-        log.info("Отправляем SSH ключ на сервер...");
-        const cmd = `sshpass -p '${password}' ssh -o StrictHostKeyChecking=no ${username}@${ip} 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys' < ${pubKeyPath}`;
-        execSync(cmd, { stdio: "ignore" });
-        log.success("SSH ключ успешно добавлен на сервер.");
-    } catch (err) {
-        log.error("Не удалось отправить SSH ключ на сервер.");
-        throw err;
+    const pubKeyPath = path.join(os.homedir(), ".ssh", "id_rsa.pub");
+
+    log.info("Отправляем SSH ключ на сервер...");
+
+    if (process.platform === "win32") {
+        const psScript = `
+            $password = ConvertTo-SecureString "${password}" -AsPlainText -Force
+            $cred = New-Object System.Management.Automation.PSCredential("${username}", $password)
+            ssh ${username}@${ip} "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys" < "${pubKeyPath}"
+        `;
+        try {
+            execSync(`powershell -Command "${psScript}"`, { stdio: "ignore" });
+            log.success("SSH ключ успешно добавлен на сервер.");
+        } catch (err) {
+            log.error("Не удалось отправить SSH ключ на сервер (PowerShell).");
+            throw err;
+        }
+    } else {
+        try {
+            const cmd = `sshpass -p '${password}' ssh -o StrictHostKeyChecking=no ${username}@${ip} 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys' < ${pubKeyPath}`;
+            execSync(cmd, { stdio: "ignore" });
+            log.success("SSH ключ успешно добавлен на сервер.");
+        } catch (err) {
+            log.error("Не удалось отправить SSH ключ на сервер.");
+            throw err;
+        }
     }
 }
-
 module.exports = async ({ reset } = {}) => {
     if (reset) {
         const resetFn = require("./reset");

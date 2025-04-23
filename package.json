@@ -1,17 +1,32 @@
 {
   "name": "sks-space-cli",
-  "version": "1.1.0",
+  "version": "1.1.4",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "cli",
+    "vps",
+    "deploy",
+    "ssh",
+    "rsync",
+    "pm2",
+    "nodejs",
+    "spa",
+    "static",
+    "automation"
+  ],
+  "author": "s1mba121",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/s1mba121/sks-space-cli"
+  },
   "bin": {
     "space": "./bin/index.js"
   },
-  "description": "",
+  "description": "A CLI tool for easy VPS management and deployment. Set up, deploy, and maintain your projects with one command.",
   "dependencies": {
     "commander": "^13.1.0",
     "fs-extra": "^11.3.0",
