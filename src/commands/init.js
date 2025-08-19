@@ -4,6 +4,7 @@ const chalk = require("chalk");
 const { saveProjectConfig } = require("../services/projectConfig");
 const { loadConfig } = require("../services/config");
 const { getLangObject } = require("../services/lang");
+const { spaceIcon } = require("../commands/spaceIcon");
 
 const lang = getLangObject();
 
@@ -34,22 +35,10 @@ module.exports = {
             },
         ]);
 
-        const configPath = `.space.${envType}.json`;
-        const exists = await fs.pathExists(configPath);
-
-        if (exists) {
-            const { overwrite } = await inquirer.prompt([
-                {
-                    type: "confirm",
-                    name: "overwrite",
-                    message: `${lang.FILE_EXISTS} ${configPath}. ${lang.OVERWRITE_CONFIRM}`,
-                    default: false,
-                },
-            ]);
-            if (!overwrite) {
-                log.warn(lang.CANCEL_INIT);
-                return;
-            }
+        const configPath = `.space.json`;
+        let existingConfig = {};
+        if (await fs.pathExists(configPath)) {
+            existingConfig = await fs.readJson(configPath);
         }
 
         const { ip, username, projectName, projectType } =
@@ -77,7 +66,7 @@ module.exports = {
                     name: "projectType",
                     message: lang.PROMPT_PROJECT_TYPE,
                     choices: [
-                        { name: lang.SPA_TYPE, value: "spa" },
+                        { name: lang.SPA_TYPE, value: "vite" },
                         { name: lang.NODE_TYPE, value: "node" },
                         { name: lang.STATIC_TYPE, value: "static" },
                     ],
@@ -86,6 +75,7 @@ module.exports = {
 
         const pathMap = {
             spa: `/var/www/spa/${projectName}`,
+            vite: `/var/www/spa/${projectName}`,
             node: `/var/www/node/${projectName}`,
             static: `/var/www/static/${projectName}`,
         };
@@ -156,119 +146,61 @@ module.exports = {
             includeEnv = loadEnv;
         }
 
-        let nginx = null;
+        let domain = null;
+        let subdomain = null;
+        let port = null;
 
-        const { nginxAlreadyConfigured } = await inquirer.prompt([
+        const { hasDomain } = await inquirer.prompt([
             {
                 type: "confirm",
-                name: "nginxAlreadyConfigured",
-                message: lang.PROMPT_NGINX_CONFIGURED,
+                name: "hasDomain",
+                message: lang.PROMPT_HAS_DOMAIN,
                 default: false,
             },
         ]);
 
-        if (!nginxAlreadyConfigured) {
-            const { wantsNginx } = await inquirer.prompt([
-                {
-                    type: "confirm",
-                    name: "wantsNginx",
-                    message: lang.PROMPT_NGINX_SETUP,
-                    default: envType === "prod",
-                },
-            ]);
-
-            if (wantsNginx) {
-                nginx = await inquirer.prompt([
-                    {
-                        type: "input",
-                        name: "domain",
-                        message: lang.PROMPT_DOMAIN,
-                    },
-                    ...(envType === "dev"
-                        ? [
-                              {
-                                  type: "input",
-                                  name: "subdomain",
-                                  message: lang.PROMPT_SUBDOMAIN,
-                                  default: "dev",
-                              },
-                              {
-                                  type: "input",
-                                  name: "port",
-                                  message: lang.PROMPT_PORT,
-                                  default: 3000,
-                              },
-                          ]
-                        : [
-                              {
-                                  type: "input",
-                                  name: "port",
-                                  message: lang.PROMPT_PORT,
-                              },
-                          ]),
-                    {
-                        type: "confirm",
-                        name: "ssl",
-                        message: lang.PROMPT_SSL,
-                        default: true,
-                    },
-                ]);
-
-                const serverName =
-                    envType === "dev"
-                        ? `${nginx.subdomain}.${nginx.domain}`
-                        : nginx.domain;
-
-                const nginxConf = `
-server {
-    listen 80;
-    server_name ${serverName};
-
-    location / {
-        proxy_pass http://localhost:${nginx.port};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    ${
-        nginx.ssl
-            ? `
-    listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/${serverName}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${serverName}/privkey.pem;
-    `
-            : ""
-    }
-}`.trim();
-
-                const nginxPath = `nginx.${envType}.conf`;
-                await fs.writeFile(nginxPath, nginxConf);
-                log.success(`${lang.NGINX_CONFIG_SAVED} ${nginxPath}`);
-            }
-        } else {
-            nginx = await inquirer.prompt([
+        if (hasDomain) {
+            const domainAnswers = await inquirer.prompt([
                 {
                     type: "input",
                     name: "domain",
                     message: lang.PROMPT_DOMAIN,
                 },
-                ...(envType === "dev"
-                    ? [
-                          {
-                              type: "input",
-                              name: "subdomain",
-                              message: lang.PROMPT_SUBDOMAIN,
-                              default: "dev",
-                          },
-                      ]
-                    : []),
+                {
+                    type: "confirm",
+                    name: "useSubdomain",
+                    message: lang.PROMPT_USE_SUBDOMAIN,
+                    default: envType === "dev",
+                },
                 {
                     type: "input",
                     name: "port",
                     message: lang.PROMPT_PORT,
                     default: 3000,
+                    validate: (value) => {
+                        const n = Number(value);
+                        return (
+                            (Number.isInteger(n) && n >= 1 && n <= 65535) ||
+                            "Port must be a number between 1 and 65535."
+                        );
+                    },
                 },
             ]);
+
+            domain = domainAnswers.domain;
+            port = parseInt(domainAnswers.port, 10);
+
+            if (domainAnswers.useSubdomain) {
+                const { sub } = await inquirer.prompt([
+                    {
+                        type: "input",
+                        name: "sub",
+                        message: lang.PROMPT_SUBDOMAIN,
+                        default: "dev",
+                    },
+                ]);
+                subdomain = sub;
+            }
         }
 
         const ignored = [
@@ -281,7 +213,7 @@ server {
             ".DS_Store",
         ];
 
-        const config = {
+        const newConfig = {
             project: {
                 name: projectName,
                 type: projectType,
@@ -295,11 +227,36 @@ server {
                 postDeploy: postDeploy || null,
                 includeEnv,
             },
-            nginx: nginx || null,
+            domain: domain
+                ? { domain, subdomain: subdomain || null, port }
+                : null,
             ignored,
         };
 
-        await saveProjectConfig(config, envType);
-        log.success(`${lang.CONFIG_CREATED} .space.${envType}.json!`);
+        const mergedConfig = {
+            ...existingConfig,
+            [envType]: newConfig,
+        };
+
+        log.section(lang.CONFIG_PREVIEW);
+        console.log(chalk.gray(JSON.stringify(mergedConfig, null, 2)));
+
+        const { confirmSave } = await inquirer.prompt([
+            {
+                type: "confirm",
+                name: "confirmSave",
+                message: lang.CONFIRM_SAVE,
+                default: true,
+            },
+        ]);
+
+        if (!confirmSave) {
+            log.warn(lang.CANCEL_INIT);
+            return;
+        }
+
+        await fs.writeJson(configPath, mergedConfig, { spaces: 2 });
+        log.success(`${lang.CONFIG_CREATED} ${configPath}!`);
+        await spaceIcon();
     },
 };

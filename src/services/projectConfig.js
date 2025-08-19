@@ -1,23 +1,24 @@
 const fs = require("fs-extra");
 const path = require("path");
 
-const getConfigPath = (env = "dev") =>
-  path.join(process.cwd(), `.space.${env}.json`);
+const getConfigPath = () => path.join(process.cwd(), `.space.json`);
 
 exports.getConfigPath = getConfigPath;
 
 exports.loadProjectConfig = async (env = "dev") => {
-  const configPath = getConfigPath(env);
-  if (!(await fs.pathExists(configPath))) return null;
-  return fs.readJson(configPath);
+    const configPath = getConfigPath();
+    if (!(await fs.pathExists(configPath))) return null;
+
+    const allConfig = await fs.readJson(configPath);
+    return allConfig[env] || null;
 };
 
-exports.saveProjectConfig = async (config, env = "dev") => {
-  const configPath = getConfigPath(env);
-  await fs.writeJson(configPath, config, { spaces: 2 });
+exports.saveProjectConfig = async (config) => {
+    const configPath = getConfigPath();
+    await fs.writeJson(configPath, config, { spaces: 2 });
 };
 
-exports.configExists = async (env = "dev") => {
-  const configPath = getConfigPath(env);
-  return fs.pathExists(configPath);
+exports.configExists = async () => {
+    const configPath = getConfigPath();
+    return fs.pathExists(configPath);
 };

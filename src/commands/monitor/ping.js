@@ -11,7 +11,7 @@ const log = {
     success: (msg) => console.log(`${chalk.green("✔")}  ${msg}`),
     warn: (msg) => console.log(`${chalk.yellow("~")}  ${msg}`),
     error: (msg) => console.log(`${chalk.red("✗")}  ${msg}`),
-    section: (msg) => console.log(chalk.whiteBright(`\n=== ${msg} === \n`)),
+    section: (msg) => console.log(chalk.whiteBright(`\n=== ${msg} ===\n`)),
 };
 
 module.exports = async () => {
@@ -32,24 +32,64 @@ module.exports = async () => {
 
     const conn = new Client();
     conn.on("ready", () => {
-        log.info(lang.PING_CHECK_START);
-        conn.exec(`ping -c 1 ${ip}`, (err, stream) => {
+        log.section(`${lang.PING_CHECK_START} ${ip}`);
+
+        conn.exec(`ping -c 4 ${ip}`, (err, stream) => {
             if (err) {
                 log.error(`${lang.PING_COMMAND_ERROR}: ${err.message}`);
                 conn.end();
                 return;
             }
 
+            let output = "";
             stream.on("data", (data) => {
-                log.info(data.toString());
+                output += data.toString();
             });
 
             stream.on("close", (code) => {
-                if (code === 0) {
-                    log.success(lang.PING_SERVER_OK);
-                } else {
-                    log.warn(lang.PING_SERVER_FAIL);
+                if (!output) {
+                    log.warn(lang.PING_NO_RESPONSE);
+                    conn.end();
+                    return;
                 }
+
+                const lines = output.split("\n");
+                const statsLine = lines.find((line) =>
+                    line.includes("packet loss")
+                );
+                const rttLine = lines.find((line) =>
+                    line.includes("rtt min/avg/max/mdev")
+                );
+
+                if (statsLine) {
+                    const lossMatch = statsLine.match(/(\d+)% packet loss/);
+                    const loss = lossMatch ? parseInt(lossMatch[1]) : null;
+
+                    if (loss === 0) {
+                        log.success(`${lang.PING_SERVER_OK} (0% packet loss)`);
+                    } else if (loss < 50) {
+                        log.warn(
+                            `${lang.PING_SERVER_WARN} (${loss}% packet loss)`
+                        );
+                    } else {
+                        log.error(
+                            `${lang.PING_SERVER_FAIL} (${loss}% packet loss)`
+                        );
+                    }
+                }
+
+                if (rttLine) {
+                    const rttMatch = rttLine.match(
+                        /rtt min\/avg\/max\/mdev = ([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+) ms/
+                    );
+                    if (rttMatch) {
+                        const [, min, avg, max] = rttMatch;
+                        log.info(
+                            `RTT: min=${min}ms, avg=${avg}ms, max=${max}ms`
+                        );
+                    }
+                }
+
                 conn.end();
             });
         });

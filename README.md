@@ -74,37 +74,38 @@ space cleanup
 ```jsonc
 // .space.dev.json
 {
-    "project": {
-        "name": "Project-Backend",
-        "type": "node", // or "spa", "static"
-        "buildCommand": null,
+    "dev": {
+        "project": {
+            "name": "Project-Backend",
+            "type": "node", // or "vite", "static"
+            "buildCommand": null,
+        },
+        "server": {
+            "ip": "123.456.78.90",
+            "username": "root",
+        },
+        "deploy": {
+            "localPath": ".",
+            "remotePath": "/var/www/node/Project-Backend",
+            "preDeploy": null,
+            "postDeploy": null,
+            "includeEnv": true,
+        },
+        "domain": {
+            "domain": "example.com",
+            "subdomain": "dev",
+            "port": 3000,
+        },
+        "ignored": [
+            ".git",
+            "node_modules",
+            "package-lock.json",
+            "yarn.lock",
+            "npm-debug.log",
+            "yarn-error.log",
+            ".DS_Store",
+        ],
     },
-    "server": {
-        "ip": "123.456.78.90",
-        "username": "root",
-    },
-    "deploy": {
-        "localPath": ".",
-        "remotePath": "/var/www/node/Project-Backend",
-        "preDeploy": null,
-        "postDeploy": null,
-        "includeEnv": true,
-    },
-    "nginx": {
-        "domain": "example.com",
-        "subdomain": "dev",
-        "port": 3000,
-    },
-    "ignored": [
-        ".git",
-        "node_modules",
-        "package-lock.json",
-        "yarn.lock",
-        "npm-debug.log",
-        "yarn-error.log",
-        ".DS_Store",
-        "uploads/",
-    ],
 }
 ```
 

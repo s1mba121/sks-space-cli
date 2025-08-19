@@ -32,7 +32,7 @@ module.exports = async () => {
 
     const conn = new Client();
     conn.on("ready", () => {
-        log.info(lang.UPTIME_CHECK_START);
+        log.section(lang.UPTIME_CHECK_START);
         conn.exec("uptime", (err, stream) => {
             if (err) {
                 log.error(`${lang.UPTIME_COMMAND_ERROR}: ${err.message}`);
@@ -40,17 +40,28 @@ module.exports = async () => {
                 return;
             }
 
+            let output = "";
             stream.on("data", (data) => {
-                log.info(data.toString());
+                output += data.toString();
             });
 
             stream.on("close", (code) => {
+                if (output) {
+                    const uptimeRegex =
+                        /up\s(.+),\s+(\d+)\susers?,\s+load average:\s(.+)/;
+                    const match = output.match(uptimeRegex);
+
+                    if (match) {
+                        const [, uptime, users, load] = match;
+                        log.success(`⏱  Uptime: ${chalk.greenBright(uptime)}`);
+                        log.info(`👤  Users: ${chalk.cyan(users)}`);
+                        log.info(`📊  Load average: ${chalk.yellow(load)}`);
+                    } else {
+                        log.info(output);
+                    }
+                }
                 conn.end();
             });
         });
-    }).connect({
-        host: ip,
-        username: username,
-        password: password,
-    });
+    }).connect({ host: ip, username, password });
 };

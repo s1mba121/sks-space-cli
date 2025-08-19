@@ -28,6 +28,7 @@
   },
   "description": "A CLI tool for easy VPS management and deployment. Set up, deploy, and maintain your projects with one command.",
   "dependencies": {
+    "cli-table3": "^0.6.5",
     "commander": "^13.1.0",
     "fs-extra": "^11.3.0",
     "inquirer": "^9.3.7",

@@ -1,4 +1,3 @@
-// src/commands/connect.js
 const os = require("os");
 const fs = require("fs");
 const path = require("path");

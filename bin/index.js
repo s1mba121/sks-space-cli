@@ -2,6 +2,7 @@
 const { program, Command } = require("commander");
 const chalk = require("chalk");
 const { saveLang, getLangObject } = require("../src/services/lang");
+const { spaceIcon } = require("../src/commands/spaceIcon");
 
 const lang = getLangObject();
 
@@ -40,6 +41,13 @@ async function withConnectionCheck(handler) {
         return handler(...args);
     };
 }
+
+program
+    .command("icon")
+    .description("Добавить иконку для .space.json в VS Code")
+    .action(async () => {
+        await spaceIcon();
+    });
 
 program
     .command("connect")
@@ -86,17 +94,7 @@ const commandList = [
         description: lang.REBOOT_DESCRIPTION,
         handler: require("../src/commands/manage/reboot"),
     },
-    {
-        name: "cleanup",
-        description: lang.CLEANUP_DESCRIPTION,
-        handler: require("../src/commands/manage/cleanup"),
-    },
     // { name: "backup", description: "Создание резервной копии проекта", handler: require("../src/commands/manage/backup") },
-    {
-        name: "update",
-        description: lang.UPDATE_DESCRIPTION,
-        handler: require("../src/commands/manage/update"),
-    },
     {
         name: "mem",
         description: lang.MEM_DESCRIPTION,

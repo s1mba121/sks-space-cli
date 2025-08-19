@@ -1,4 +1,3 @@
-// commands/deploy.js
 const fs = require("fs-extra");
 const path = require("path");
 const os = require("os");
@@ -38,7 +37,9 @@ async function ensureRsyncInstalled() {
                     execSync("apt-get --version", { stdio: "ignore" });
                     execSync(
                         "sudo apt-get update && sudo apt-get install -y rsync",
-                        { stdio: "inherit" }
+                        {
+                            stdio: "inherit",
+                        }
                     );
                 } catch {
                     execSync("sudo yum install -y rsync", { stdio: "inherit" });
@@ -85,8 +86,7 @@ async function deployToServer(config) {
         )
         .join(" ");
 
-    // === Генерация start-server.sh ===
-    let port = config.nginx?.port || 4000;
+    let port = config.domain?.port || 4000;
 
     let startScriptContent = `#!/bin/bash
 PORT=${port}
@@ -97,8 +97,57 @@ fuser -k $PORT/tcp || true
     if (type === "node") {
         startScriptContent += `npm install --production\n`;
         startScriptContent += `nohup node server.js </dev/null > app.log 2>&1 &\n`;
-    } else {
+    } else if (type === "static") {
         startScriptContent += `nohup npx http-server -p $PORT </dev/null > http-server.log 2>&1 &\n`;
+    }
+
+    if (type === "vite" || type === "spa") {
+        const serverJs = `
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const app = express();
+const port = process.env.PORT || ${port};
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname);
+
+app.use(express.static(distPath));
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+});
+
+app.listen(port, () => {
+    console.log(\`Server running at http://localhost:\${port}\`);
+});
+`.trim();
+
+        const pkgJson = {
+            type: "module",
+            scripts: {
+                start: "node server.js",
+            },
+            dependencies: {
+                express: "^4.18.2",
+            },
+        };
+
+        fs.writeFileSync(path.join(localPath, "server.js"), serverJs);
+        fs.writeFileSync(
+            path.join(localPath, "package.json"),
+            JSON.stringify(pkgJson, null, 2)
+        );
+
+        startScriptContent = `#!/bin/bash
+PORT=${port}
+cd $(dirname "$0")
+fuser -k $PORT/tcp || true
+npm install --production
+nohup node server.js </dev/null > app.log 2>&1 &
+`;
     }
 
     fs.writeFileSync(
@@ -148,9 +197,15 @@ fuser -k $PORT/tcp || true
         execSync(postDeploy, { stdio: "inherit" });
     }
 
-    const finalURL = config.nginx
-        ? `https://${config.nginx.subdomain ? config.nginx.subdomain + "." : ""}${config.nginx.domain}`
-        : `http://${ip}:${port}`;
+    let finalURL;
+    if (config.domain) {
+        const prefix = config.domain.subdomain
+            ? `${config.domain.subdomain}.`
+            : "";
+        finalURL = `https://${prefix}${config.domain.domain}`;
+    } else {
+        finalURL = `http://${ip}:${port}`;
+    }
 
     log.success(lang.DEPLOY_SUCCESS);
     log.ip(lang.ACCESSIBLE_AT(chalk.underline(finalURL)));
